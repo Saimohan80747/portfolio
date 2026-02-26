@@ -162,8 +162,8 @@
         async function deleteMessage(id) {
             if (!confirm('Delete this message?')) return;
             try {
-                await fetch('/api/messages/' + id, {
-                    method: 'DELETE',
+                await fetch('/api/messages?delete=' + id, {
+                    method: 'GET',
                     headers: { 'x-api-key': apiKey }
                 });
                 document.getElementById('msg-' + id).remove();

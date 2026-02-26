@@ -1,0 +1,7 @@
+{
+    "rewrites": [
+        { "source": "/api/contact", "destination": "/api/contact" },
+        { "source": "/api/messages", "destination": "/api/messages" },
+        { "source": "/api/messages/:id", "destination": "/api/messages" }
+    ]
+}
