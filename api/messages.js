@@ -1,35 +1,6 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-
-const DB_PATH = '/tmp/portfolio.db';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kpreqhajfeqlmiwahxli.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwcmVxaGFqZmVxbG1pd2FoeGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTUxMzAsImV4cCI6MjA4NzY5MTEzMH0.sPOz06fad0h4kJeKpn8jrkdI13VytFbMJiJ6dT29hRw';
 const API_KEY = 'portfolio-admin-2026';
-
-async function getDB() {
-    const SQL = await initSqlJs();
-    let db;
-    if (fs.existsSync(DB_PATH)) {
-        const buffer = fs.readFileSync(DB_PATH);
-        db = new SQL.Database(buffer);
-    } else {
-        db = new SQL.Database();
-        db.run(`
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL,
-                subject TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-    }
-    return db;
-}
-
-function saveDB(db) {
-    const data = db.export();
-    fs.writeFileSync(DB_PATH, Buffer.from(data));
-}
 
 module.exports = async (req, res) => {
     // CORS
@@ -45,41 +16,49 @@ module.exports = async (req, res) => {
         return res.status(401).json({ success: false, message: 'Unauthorized. Invalid API key.' });
     }
 
-    try {
-        const db = await getDB();
+    const headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+    };
 
-        // DELETE /api/messages?id=1
+    try {
+        // DELETE /api/messages?delete=1
         if (req.method === 'DELETE' || req.query.delete) {
             const id = req.query.id || req.query.delete;
             if (id) {
-                db.run('DELETE FROM messages WHERE id = ?', [id]);
-                saveDB(db);
-                db.close();
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/messages?id=eq.${id}`, {
+                    method: 'DELETE',
+                    headers
+                });
+                if (!response.ok) {
+                    const err = await response.text();
+                    console.error('Supabase delete error:', err);
+                    return res.status(500).json({ success: false, message: 'Failed to delete.' });
+                }
                 return res.status(200).json({ success: true, message: 'Message deleted.' });
             }
         }
 
         // GET /api/messages
-        if (req.method === 'GET') {
-            const result = db.exec('SELECT * FROM messages ORDER BY created_at DESC');
-            let messages = [];
-            if (result.length > 0) {
-                const columns = result[0].columns;
-                messages = result[0].values.map(row => {
-                    const obj = {};
-                    columns.forEach((col, i) => obj[col] = row[i]);
-                    return obj;
-                });
+        if (req.method === 'GET' && !req.query.delete) {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/messages?order=created_at.desc&select=*`, {
+                method: 'GET',
+                headers
+            });
+            if (!response.ok) {
+                const err = await response.text();
+                console.error('Supabase fetch error:', err);
+                return res.status(500).json({ success: false, message: 'Failed to fetch messages.' });
             }
-            db.close();
+            const messages = await response.json();
             return res.status(200).json({ success: true, count: messages.length, messages });
         }
 
-        db.close();
         return res.status(405).json({ success: false, message: 'Method not allowed.' });
 
     } catch (err) {
-        console.error('DB error:', err.message);
+        console.error('Server error:', err.message);
         return res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
