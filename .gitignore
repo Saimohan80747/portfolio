@@ -1,0 +1,6 @@
+node_modules/
+portfolio.db
+sqlite-jdbc.jar
+*.class
+package-lock.json
+.env
